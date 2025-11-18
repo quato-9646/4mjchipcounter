@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4人麻雀チップカウンタ</title>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
+  .meter { margin-bottom: 30px; }
+  .meter button {
+    margin: 3px;
+    padding: 10px 20px;
+    font-size: 18px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .meter button:hover { background-color: #45a049; }
+  #resetBtn, #saveBtn {
+    margin-top: 30px;
+    padding: 14px 50px;
+    font-size: 20px;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  #resetBtn { background-color: #f55; }
+  #saveBtn { background-color: #007bff; }
+  input[type="number"] { width: 60px; font-size: 16px; }
+  input[name="playerName"] { width: 160px; font-size: 18px; }
+  label { margin-left: 10px; font-size: 16px; }
+  #total { font-size: 22px; margin-top: 20px; }
+  table { width: 90%; margin: 30px auto; border-collapse: collapse; }
+  th, td { border: 1px solid #ccc; padding: 6px 10px; }
+  th { background-color: #f5f5f5; }
+  td button { padding: 4px 8px; font-size: 14px; border-radius: 5px; cursor: pointer; color: white; border: none; }
+  td button.restore { background-color: #28a745; }
+  td button.delete { background-color: #dc3545; }
+</style>
+</head>
+<body>
+
+<h1>4人麻雀チップカウンタ</h1>
+
+<div id="meters"></div>
+
+<div id="total">合計: 0（OK）</div>
+
+<button id="saveBtn" onclick="saveData()">保存</button>
+<button id="resetBtn" onclick="resetAll()">リセット</button>
+
+<h2>保存履歴</h2>
+<table>
+  <thead>
+    <tr>
+      <th>ラベル</th>
+      <th>1席</th>
+      <th>2席</th>
+      <th>3席</th>
+      <th>4席</th>
+      <th>合計</th>
+      <th>操作</th>
+    </tr>
+  </thead>
+  <tbody id="historyBody"></tbody>
+</table>
+
+<script>
+const playerCount = 4;
+const values = Array(playerCount).fill(0);
+let history = [];
+
+function createMeters() {
+  const container = document.getElementById("meters");
+  container.innerHTML = "";
+
+  for (let i = 1; i <= playerCount; i++) {
+    const meter = document.createElement("div");
+    meter.className = "meter";
+    meter.id = `meter${i}`;
+
+    meter.innerHTML = `
+      <h3><input type="text" id="name${i}" name="playerName" value="${i}席">: <span class="value">0</span></h3>
+      <button onclick="changeValue(${i}, -50)">−50</button>
+      <button onclick="changeValue(${i}, -10)">−10</button>
+      <button onclick="changeValue(${i}, -5)">−5</button>
+      <button onclick="changeValue(${i}, -1)">−1</button>
+      <button onclick="changeValue(${i}, 1)">＋1</button>
+      <button onclick="changeValue(${i}, 5)">＋5</button>
+      <button onclick="changeValue(${i}, 10)">＋10</button>
+      <button onclick="changeValue(${i}, 50)">＋50</button><br>
+      <label>直接入力: <input type="number" id="input${i}" value="0" onchange="setValue(${i})"></label>
+      <label><input type="checkbox" id="tsumo${i}"> ツモ</label>
+    `;
+
+    container.appendChild(meter);
+  }
+}
+
+createMeters();
+
+function changeValue(index, delta) {
+  const tsumo = [];
+  for (let i = 1; i <= playerCount; i++) {
+    tsumo.push(document.getElementById(`tsumo${i}`).checked);
+  }
+
+  let actualDelta = delta;
+
+  if (tsumo[index - 1]) {
+    const per = delta / (playerCount - 1);
+    for (let i = 0; i < playerCount; i++) {
+      if (i !== index - 1) values[i] -= per;
+    }
+  }
+
+  values[index - 1] += actualDelta;
+  updateDisplayAll();
+}
+
+function setValue(index) {
+  const input = document.getElementById(`input${index}`);
+  const val = parseFloat(input.value);
+  values[index - 1] = isNaN(val) ? 0 : val;
+  updateDisplayAll();
+}
+
+function updateDisplayAll() {
+  for (let i = 0; i < playerCount; i++) {
+    document.querySelector(`#meter${i + 1} .value`).textContent = values[i];
+    document.getElementById(`input${i + 1}`).value = values[i];
+  }
+  updateTotal();
+}
+
+function updateTotal() {
+  const total = values.reduce((a, b) => a + b, 0);
+  const elem = document.getElementById("total");
+  if (Math.abs(total) < 1e-9) {
+    elem.textContent = `合計: ${total}（OK）`;
+    elem.style.color = "green";
+  } else {
+    elem.textContent = `合計: ${total}（NG）`;
+    elem.style.color = "red";
+  }
+}
+
+function resetAll() {
+  if (confirm("リセットしますか？")) {
+    for (let i = 0; i < playerCount; i++) {
+      values[i] = 0;
+      document.getElementById(`tsumo${i + 1}`).checked = false;
+    }
+    updateDisplayAll();
+  }
+}
+
+function saveData() {
+  const label = prompt("ラベルを入力してください:");
+  if (!label) return;
+
+  const names = [], tsumoStates = [];
+  for (let i = 1; i <= playerCount; i++) {
+    names.push(document.getElementById(`name${i}`).value);
+    tsumoStates.push(document.getElementById(`tsumo${i}`).checked);
+  }
+
+  const record = {
+    label,
+    names,
+    values: [...values],
+    tsumo: tsumoStates,
+    total: values.reduce((a, b) => a + b, 0)
+  };
+
+  history.push(record);
+  renderHistory();
+}
+
+function renderHistory() {
+  const tbody = document.getElementById("historyBody");
+  tbody.innerHTML = "";
+
+  history.forEach((h, index) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${h.label}</td>
+      <td>${h.names[0]}: ${h.values[0]}</td>
+      <td>${h.names[1]}: ${h.values[1]}</td>
+      <td>${h.names[2]}: ${h.values[2]}</td>
+      <td>${h.names[3]}: ${h.values[3]}</td>
+      <td>${h.total}</td>
+      <td>
+        <button class="restore" onclick="restoreData(${index})">復元</button>
+        <button class="delete" onclick="deleteHistory(${index})">削除</button>
+      </td>
+    `;
+    tbody.prepend(row);
+  });
+}
+
+function restoreData(index) {
+  const h = history[index];
+  for (let i = 0; i < playerCount; i++) {
+    document.getElementById(`name${i + 1}`).value = h.names[i];
+    values[i] = h.values[i];
+    document.getElementById(`tsumo${i + 1}`).checked = h.tsumo[i];
+  }
+  updateDisplayAll();
+  alert(`「${h.label}」を復元しました。`);
+}
+
+function deleteHistory(index) {
+  if (confirm(`削除しますか？`)) {
+    history.splice(index, 1);
+    renderHistory();
+  }
+}
+</script>
+
+</body>
+</html>
